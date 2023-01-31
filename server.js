@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended:true }))
 app.use(express.json())
 
 
-db.execute("SELECT * FROM railway.iamtest").then(response => console.log(response)).catch(err => console.log(err))
+// db.execute("SELECT * FROM railway.iamtest").then(response => console.log(response)).catch(err => console.log(err))
 
 // Homepage API redirect
 app.get("/", (req, res) => {
