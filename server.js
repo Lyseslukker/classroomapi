@@ -103,6 +103,7 @@ app.post("/signup", (req, res) => {
 // POST login
 app.post("/login", (req, res) => {
     console.log(req.body)
+    console.log(req.cookies)
     // res.cookie('s', 'w');
     loginCheckUpper(req.body.email, req.body.password)
         .then((response) => {
@@ -115,10 +116,19 @@ app.post("/login", (req, res) => {
 
             // FOUND!
             if (response.length === 1) {
-                console.log("id: ", response[0].id)
+                // console.log("id: ", response[0].id)
                 createUUID(response[0].id)
                     .then((uuid) => {
-                        console.log("New uuid: ", uuid)
+                        let cookieID = {
+                            id: uuid,
+                            name: response[0].firstname
+                        }
+                        const stringifyCookieID = JSON.stringify(cookieID)
+
+                        console.log("New uuid: ", stringifyCookieID)
+                        res.cookie("classroomid", stringifyCookieID, {
+                            maxAge: "300000"
+                        })
                         res.send({ status: "fulfilled", tempid: uuid })
                     })
                     .catch((err) => {
@@ -127,9 +137,15 @@ app.post("/login", (req, res) => {
             }
         })
         .catch((error) => {
-            
             console.log("Error: ", error)
         })
+})
+
+app.get("/login", (req, res) => {
+    console.log(req.cookies.length)
+    res.cookie("hej", "you", { maxAge: "300000" })
+    res.send({status: "none"})
+    res.end()
 })
 
 app.listen(PORT, () => {
