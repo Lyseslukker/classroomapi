@@ -10,9 +10,10 @@ const firstnameCheckUpper = require("./functions/superfunctions/firstnameCheckUp
 const lastnameCheckUpper = require("./functions/superfunctions/lastnameCheckUpper.js")
 const passwordCheckUpper = require("./functions/superfunctions/passwordCheckUpper.js")
 const confirmPasswordCheckUpper = require("./functions/superfunctions/confirmPasswordCheckUpper.js")
+const createUUID = require("./functions/db/createUUID.js")
 const db = require("./db/database.js");
 const { postSignup } = require("./controllers/Signup/postSignup.js")
-const loginCheckUpper = require("./functions/superfunctions/loginCheckUpper.js")
+const loginCheckUpper = require("./functions/Login/loginCheckUpper.js")
 
 
 const PORT = process.env.PORT || 3500
@@ -20,14 +21,14 @@ console.log()
 const testPort = 3500
 // Cross Origin Allowed
 app.use(cors({
-    origin: ["http://localhost:3500/*", "http://127.0.0.1:3500/*", "http://localhost:3000/*"],
+    origin: "http://localhost:3000",
     credentials: true
 }))
+app.use(cookieParser())
 // Can extract URLparams
 app.use(express.urlencoded({ extended:true }))
 // Can extract body from incomming post etc. requests
 app.use(express.json())
-app.use(cookieParser())
 
 
 
@@ -67,58 +68,68 @@ app.get("/test", postSignup)
 app.post("/signup", (req, res) => {
     let reqObject = req.body
 
-    // Promise.allSettled([
-    //     emailCheckUpper(reqObject.email),
-    //     firstnameCheckUpper(reqObject.firstname),
-    //     lastnameCheckUpper(reqObject.lastname),
-    //     passwordCheckUpper(reqObject.password),
-    //     confirmPasswordCheckUpper(reqObject.password, reqObject.confirmPassword)
-    // ])
-    // .then((response) => {
-    //     const countToRedirect = response.filter((res) => {
-    //         return res.status === "rejected"
-    //     })
-    //     if (countToRedirect.length === 0) { 
-    //         console.log("Time to redirect!") 
-    //         db.execute('INSERT INTO users (email, firstname, lastname, password, role) VALUES (?, ?, ?, ?, ?)', 
-    //         [reqObject.email, reqObject.firstname, reqObject.lastname, reqObject.password, reqObject.role])
-    //         res.send(response)
-    //         res.end()
-    //     }
-    //     if (countToRedirect.length !== 0) {
-    //         console.log("Something went wrong, sending errors!")
-    //         res.send(response)
-    //         res.end()
-    //     }
-    // })
-    // .catch((err) => {
-    //     console.log("Error: ", err)
-    //     res.send(err)
-    //     res.end()
-    // })
+    Promise.allSettled([
+        emailCheckUpper(reqObject.email),
+        firstnameCheckUpper(reqObject.firstname),
+        lastnameCheckUpper(reqObject.lastname),
+        passwordCheckUpper(reqObject.password),
+        confirmPasswordCheckUpper(reqObject.password, reqObject.confirmPassword)
+    ])
+    .then((response) => {
+        const countToRedirect = response.filter((res) => {
+            return res.status === "rejected"
+        })
+        if (countToRedirect.length === 0) { 
+            console.log("Time to redirect!") 
+            db.execute('INSERT INTO users (email, firstname, lastname, password, role) VALUES (?, ?, ?, ?, ?)', 
+            [reqObject.email, reqObject.firstname, reqObject.lastname, reqObject.password, reqObject.role])
+            res.send(response)
+            res.end()
+        }
+        if (countToRedirect.length !== 0) {
+            console.log("Something went wrong, sending errors!")
+            res.send(response)
+            res.end()
+        }
+    })
+    .catch((err) => {
+        console.log("Error: ", err)
+        res.send(err)
+        res.end()
+    })
 
 })
 
 // POST login
 app.post("/login", (req, res) => {
-    // console.log(req.body)
-    // loginCheckUpper(req.body.email, req.body.password)
-    //     .then((response) => {
-    //         res.cookie('mysql', '22', {
+    console.log(req.body)
+    // res.cookie('s', 'w');
+    loginCheckUpper(req.body.email, req.body.password)
+        .then((response) => {
+            console.log("Login Checkup: ", response)
 
-    //         })
-    //         res.send({
-    //             status: "rejected",
-    //             reason: "User not found"
-    //         })
-    //     })
-    //     .catch((error) => {
-    //         res.send({
-    //             status: "rejected",
-    //             reason: "User not found"
-    //         })
-    //         console.log("Error: ", error)
-    //     })
+            // NOT FOUND!
+            if (response.length === 0) {
+                res.send({ status: "rejected", reason: "No user with that email and password exists." })
+            }
+
+            // FOUND!
+            if (response.length === 1) {
+                console.log("id: ", response[0].id)
+                createUUID(response[0].id)
+                    .then((uuid) => {
+                        console.log("New uuid: ", uuid)
+                        res.send({ status: "fulfilled", tempid: uuid })
+                    })
+                    .catch((err) => {
+                        res.send({status: "rejected", reason: err})
+                    })
+            }
+        })
+        .catch((error) => {
+            
+            console.log("Error: ", error)
+        })
 })
 
 app.listen(PORT, () => {
