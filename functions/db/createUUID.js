@@ -1,10 +1,11 @@
+const db = require("../../db/database.js")
+const { v4: uuidv4 } = require('uuid');
 const createUUID = (id) => {
     return new Promise((resolve, reject) => {
-        const db = require("../../db/database.js")
-        const { v4: uuidv4 } = require('uuid');
         const uuid = uuidv4()
         if(uuid) {
-            db.execute(`UPDATE users SET tempid = '${uuid}' WHERE id = ${id};`)
+            // Creates tempdesktopid in DB
+            db.execute(`UPDATE users SET tempdesktopid = '${uuid}' WHERE id = ${id};`)
                 .then((dbResponse) => {
                     // console.log(dbResponse)
                     resolve(uuid)

@@ -4,7 +4,9 @@ const cors = require("cors")
 const cookieParser = require("cookie-parser")
 // const cookieSession = require("cookie-session")
 // const compression = require("compression")
-
+const encrypt = require("./functions/db/encrypt.js")
+const decrypt = require("./functions/db/decrypt.js")
+const testencrypt = require("./functions/db/testencrypt.js")
 const emailCheckUpper = require("./functions/superfunctions/emailCheckUpper.js")
 const firstnameCheckUpper = require("./functions/superfunctions/firstnameCheckUpper.js")
 const lastnameCheckUpper = require("./functions/superfunctions/lastnameCheckUpper.js")
@@ -12,6 +14,7 @@ const passwordCheckUpper = require("./functions/superfunctions/passwordCheckUppe
 const confirmPasswordCheckUpper = require("./functions/superfunctions/confirmPasswordCheckUpper.js")
 const createUUID = require("./functions/db/createUUID.js")
 const db = require("./db/database.js");
+const createNewUser = require("./functions/db/createNewUser.js")
 const { postSignup } = require("./controllers/Signup/postSignup.js")
 const loginCheckUpper = require("./functions/Login/loginCheckUpper.js")
 
@@ -67,6 +70,7 @@ app.get("/test", postSignup)
 // POST signup
 app.post("/signup", (req, res) => {
     let reqObject = req.body
+    console.log(reqObject)
 
     Promise.allSettled([
         emailCheckUpper(reqObject.email),
@@ -81,10 +85,15 @@ app.post("/signup", (req, res) => {
         })
         if (countToRedirect.length === 0) { 
             console.log("Time to redirect!") 
-            db.execute('INSERT INTO users (email, firstname, lastname, password, role) VALUES (?, ?, ?, ?, ?)', 
-            [reqObject.email, reqObject.firstname, reqObject.lastname, reqObject.password, reqObject.role])
-            res.send(response)
-            res.end()
+            createNewUser(reqObject.email, reqObject.firstname, reqObject.lastname, reqObject.password, reqObject.role)
+                .then((response) => {
+                    res.send(response)
+                    res.end()
+                })
+                .catch((err) => {
+                    res.send(err)
+                    res.end()
+                })
         }
         if (countToRedirect.length !== 0) {
             console.log("Something went wrong, sending errors!")
@@ -102,12 +111,21 @@ app.post("/signup", (req, res) => {
 
 // POST login
 app.post("/login", (req, res) => {
-    console.log(req.body)
-    console.log(req.cookies)
+    console.log("post('/login') req.body:\n", req.body)
+    console.log("post('/login') req.cookies:\n", req.cookies)
+    // const rawHeadersArray = req.rawHeaders
+    // const indexOfScreenSize = rawHeadersArray.indexOf("screenSize") + 1
+    // const screenSize = rawHeadersArray[indexOfScreenSize]
+    // const screenObject = JSON.parse(screenSize)
+    // console.log("post('/login') req.rawHeaders (screensize):\n", screenObject)
     // res.cookie('s', 'w');
-    loginCheckUpper(req.body.email, req.body.password)
+
+    res.send({yehaw: "hihi"})
+    res.end()
+    
+    loginCheckUpper(req.body.credentials.email, req.body.credentials.password)
         .then((response) => {
-            console.log("Login Checkup: ", response)
+            // console.log("Login Checkup: ", response)
 
             // NOT FOUND!
             if (response.length === 0) {
@@ -125,7 +143,7 @@ app.post("/login", (req, res) => {
                         }
                         const stringifyCookieID = JSON.stringify(cookieID)
 
-                        console.log("New uuid: ", stringifyCookieID)
+                        // console.log("New uuid: ", stringifyCookieID)
                         res.cookie("classroomid", stringifyCookieID, {
                             maxAge: "300000"
                         })
@@ -142,10 +160,16 @@ app.post("/login", (req, res) => {
 })
 
 app.get("/login", (req, res) => {
-    console.log(req.cookies.length)
-    res.cookie("hej", "you", { maxAge: "300000" })
-    res.send({status: "none"})
-    res.end()
+    console.log(req.cookies.classroomid)
+    if (req.cookies.classroomid) {
+        res.cookie("Status", "Success", { maxAge: "300000" })
+        res.send({status: "fulfilled", reason: "Provide password"})
+    }
+    if (!req.cookies.classroomid) {
+        res.cookie("hej", "you", { maxAge: "300000" })
+        res.send({status: "rejected", reason: "No id"})
+    }
+
 })
 
 app.listen(PORT, () => {
