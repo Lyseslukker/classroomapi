@@ -1,39 +1,25 @@
-const crypto = require('crypto');
-const dotenv = require("dotenv");
+const crypto = require('crypto')
+const dotenv = require("dotenv")
 dotenv.config()
 
+var iv = Buffer.from(process.env.ENCRYPTION_IV, 'utf8')
+const secret = process.env.ENCRYPTION_KEY
 
-// function decrypt(encrypted) {
-//     return new Promise((resolve, reject) => {
-//         const secretkey = process.env.ENCRYPTION_KEY
-//         const decipher = crypto.createDecipher('aes-256-cbc', secretkey);
-//         let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-//         decrypted += decipher.final('utf8');
-        
-//         try {
-//             resolve(decrypted)
-//         } catch (error) {
-//             reject("Could'nt decrypt the message")
-//         }
-        
-        
-//         return decrypted;
-//     })
-// }
-
-
-const decrypt = ((text) => {
+function decrypt(encrypted) {
     return new Promise((resolve, reject) => {
-        let decipher = crypto.createDecipheriv(process.env.ENCRYPTION_ALGO, process.env.ENCRYPTION_KEY, process.env.ENCRYPTION_IV);
-        let decrypted = decipher.update(text, 'base64', 'utf8');
-
-        if (decrypted) {
-            resolve(decrypted + decipher.final('utf8'))
-        }
+        const decipher = crypto.createDecipheriv("aes-256-cbc", secret, Buffer.from(iv, "hex"))
+        let decrypted = decipher.update(encrypted, "hex", "utf8")
+        decrypted += decipher.final("utf8")
+        
         if (!decrypted) {
-            reject("Failed to decrypt")
+            reject("Could'nt decrypt message")
         }
+        if (decrypted) {
+            resolve(decrypted)
+        }
+
     })
-});
+}
+
 
 module.exports = decrypt

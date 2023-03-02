@@ -1,26 +1,26 @@
 const express = require("express")
 const app = express()
+const fs = require("fs")
 const cors = require("cors")
 const cookieParser = require("cookie-parser")
 // const cookieSession = require("cookie-session")
+const validator = require("validator").default;
+const { performance } = require("perf_hooks")
+// 
 // const compression = require("compression")
-const encrypt = require("./functions/db/encrypt.js")
-const decrypt = require("./functions/db/decrypt.js")
-const testencrypt = require("./functions/db/testencrypt.js")
+const rootdir = require("./rootdir")
 const emailCheckUpper = require("./functions/superfunctions/emailCheckUpper.js")
 const firstnameCheckUpper = require("./functions/superfunctions/firstnameCheckUpper.js")
 const lastnameCheckUpper = require("./functions/superfunctions/lastnameCheckUpper.js")
 const passwordCheckUpper = require("./functions/superfunctions/passwordCheckUpper.js")
 const confirmPasswordCheckUpper = require("./functions/superfunctions/confirmPasswordCheckUpper.js")
-const createUUID = require("./functions/db/createUUID.js")
 const db = require("./db/database.js");
 const createNewUser = require("./functions/db/createNewUser.js")
 const { postSignup } = require("./controllers/Signup/postSignup.js")
-const loginCheckUpper = require("./functions/Login/loginCheckUpper.js")
+const createFakeIdObject = require("./functions/fakedb/createFakeIdObject.js")
 
 
 const PORT = process.env.PORT || 3500
-console.log()
 const testPort = 3500
 // Cross Origin Allowed
 app.use(cors({
@@ -38,22 +38,29 @@ app.use(express.json())
 
 
 
-const tempFunction = () => {
-    const start = performance.now()
-    console.log("Start: ", start)
-    return db.execute("SELECT * FROM railway.iamtest")
-        .then((response) => {
-            const end = performance.now()
-            console.log("End: ", end)
-            console.log("Total time: ", end - start)
-            console.log(response[0])
-        })
-        .catch((err) => {
-            console.log(err)
-        })
 
-}
+// const tempFunction = () => {
+//     const start = performance.now()
+//     console.log("Start: ", start)
+//     return db.execute("SELECT * FROM railway.iamtest")
+//         .then((response) => {
+//             const end = performance.now()
+//             console.log("End: ", end)
+//             console.log("Total time: ", end - start)
+//             console.log(response[0])
+//         })
+//         .catch((err) => {
+//             console.log(err)
+//         })
+
+// }
 // tempFunction()
+
+// // VALIDATOR
+// let strongPassword = validator.isStrongPassword("Jegersej123!")
+// let isRealEmail = validator.isEmail("sonny@gmail.com")
+// let isANumber = validator.isInt("123")
+
 
 
 
@@ -64,10 +71,7 @@ app.get("/", (req, res) => {
     res.end()
 })
 
-app.get("/test", postSignup)
-
-
-// POST signup
+// POST signup ( DONE )
 app.post("/signup", (req, res) => {
     let reqObject = req.body
     console.log(reqObject)
@@ -111,66 +115,106 @@ app.post("/signup", (req, res) => {
 
 // POST login
 app.post("/login", (req, res) => {
-    console.log("post('/login') req.body:\n", req.body)
-    console.log("post('/login') req.cookies:\n", req.cookies)
-    // const rawHeadersArray = req.rawHeaders
-    // const indexOfScreenSize = rawHeadersArray.indexOf("screenSize") + 1
-    // const screenSize = rawHeadersArray[indexOfScreenSize]
-    // const screenObject = JSON.parse(screenSize)
-    // console.log("post('/login') req.rawHeaders (screensize):\n", screenObject)
-    // res.cookie('s', 'w');
+    const requestEmail = req.body.credentials.email
+    const requestPassword = req.body.credentials.password
+    const requestScreenWidth = req.body.screen.width
+    // const requestScreenAngle = req.body.screen.angle
+    const requestClientDate = req.body.clientTimeObject
+    // console.log(requestClientDate)
 
-    res.send({yehaw: "hihi"})
-    res.end()
+    const isEmail = validator.isEmail(requestEmail)
     
-    loginCheckUpper(req.body.credentials.email, req.body.credentials.password)
-        .then((response) => {
-            // console.log("Login Checkup: ", response)
+    if (!isEmail) {
+        res.send({ status: "rejected", reason: "Not a real email!" })
+    }
+    if (isEmail) {
+        createFakeIdObject(requestClientDate, requestScreenWidth, requestEmail, requestPassword)
+            .then((finalObject) => {
+                // console.log(finalObject)
 
-            // NOT FOUND!
-            if (response.length === 0) {
-                res.send({ status: "rejected", reason: "No user with that email and password exists." })
-            }
+                fs.readFile(`${rootdir()}/db/fakedb.json`, 'utf-8', (err, data) => {
+                    if (err) {
+                        console.log(err)
+                    }
+                    if (!err) {
+                        const fakedb = JSON.parse(data)
+                        fakedb.push(finalObject)
+                        const stringedFakedb = JSON.stringify(fakedb)
+                        // console.log(finalObject)
+                        fs.writeFile(`${rootdir()}/db/fakedb.json`, stringedFakedb, (err) => {
+                            if (err) {
+                                console.log(err)
+                                res.send({status: "rejected"})
+                                res.end()
+                            }
+                            if (!err) {
+                                console.log("Success!")
+                                // console.log(finalObject)
 
-            // FOUND!
-            if (response.length === 1) {
-                // console.log("id: ", response[0].id)
-                createUUID(response[0].id)
-                    .then((uuid) => {
-                        let cookieID = {
-                            id: uuid,
-                            name: response[0].firstname
-                        }
-                        const stringifyCookieID = JSON.stringify(cookieID)
-
-                        // console.log("New uuid: ", stringifyCookieID)
-                        res.cookie("classroomid", stringifyCookieID, {
-                            maxAge: "300000"
+                                res.cookie("id", finalObject.tempid, {
+                                    maxAge: requestClientDate.clientCookieMaxAge,
+                                    httpOnly: true,
+                                    sameSite: "strict",
+                                    path: "http://localhost:3500"
+                                })
+                                res.send({
+                                    status: "fulfilled",
+                                    csrf: finalObject.csrf,
+                                    redirect: true
+                                })
+                                res.end()
+                            }
                         })
-                        res.send({ status: "fulfilled", tempid: uuid })
-                    })
-                    .catch((err) => {
-                        res.send({status: "rejected", reason: err})
-                    })
+                    }
+                })
+            })
+    }
+
+
+})
+
+// GET home
+app.get("/home", (req, res) => {
+    const clientCookie = req.cookies
+    // console.log("Client Cookie: ", clientCookie)
+    const clientCSRF = req.headers.csrf
+    // console.log("Client CSRF: ", clientCSRF)
+
+    fs.readFile(`${rootdir()}/db/fakedb.json`, 'utf-8', (err, data) => {
+        if (err) {
+            console.log(err)
+        }
+        if (!err) {
+            const fakedb = JSON.parse(data)
+            // console.log("Parsed fakedb: ", fakedb)
+            const isFound = fakedb.filter((user) => {
+                return user.csrf === clientCSRF && user.tempid === clientCookie.id ? user : false
+            })
+            console.log(isFound)
+            if (isFound.length === 0) {
+                res.send({status: "rejected"})
+                res.end()
             }
-        })
-        .catch((error) => {
-            console.log("Error: ", error)
-        })
-})
+            if (isFound.length === 1) {
+                res.send({status: "fulfilled"})
+                res.end()
+            }
+        }
+    })
 
-app.get("/login", (req, res) => {
-    console.log(req.cookies.classroomid)
-    if (req.cookies.classroomid) {
-        res.cookie("Status", "Success", { maxAge: "300000" })
-        res.send({status: "fulfilled", reason: "Provide password"})
-    }
-    if (!req.cookies.classroomid) {
-        res.cookie("hej", "you", { maxAge: "300000" })
-        res.send({status: "rejected", reason: "No id"})
-    }
 
 })
+
+app.post("/createclass", (req, res) => {
+    
+})
+
+
+
+
+
+
+
 
 app.listen(PORT, () => {
     console.log("App started, started listening")
